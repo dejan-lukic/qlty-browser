@@ -5,6 +5,12 @@ import { addPageLoadListener } from "./github/events";
 
 const coverageData = new Map<string, FileCoverage>();
 
+const enum CoverageState {
+  HIT = 1,
+  MISS = 0,
+  OMIT = -1,
+}
+
 export function tryInjectDiffUI(): void {
   try {
     void tryInjectDiffCommitUI();
@@ -302,6 +308,13 @@ async function injectIntoFileContainer(
   }
 }
 
+function hitCountToState(hitCount: number): CoverageState {
+  if (hitCount >= 1) return CoverageState.HIT;
+  if (hitCount === 0) return CoverageState.MISS;
+
+  return CoverageState.OMIT;
+}
+
 function injectIntoGutterCell(cell: Element, coverage: FileCoverage): void {
   cell.querySelectorAll(".qlty-coverage-line").forEach((el) => el.remove());
 
@@ -317,16 +330,21 @@ function injectIntoGutterCell(cell: Element, coverage: FileCoverage): void {
     return;
   }
 
-  const hit = coverage.hits[lineNumber] ?? 0;
+  const coverageStateClassMap = {
+    [CoverageState.HIT]: 'qlty-coverage-hit',
+    [CoverageState.MISS]: 'qlty-coverage-miss',
+    [CoverageState.OMIT]: 'qlty-coverage-omit',
+  };
+
+  const omittedHitCount = -1;
+  const hitCount = coverage.hits[lineNumber] ?? omittedHitCount;
+
+  const coverageState = hitCountToState(hitCount);
+  const coverageClass = coverageStateClassMap[coverageState];
+
   const el = cell.appendChild(document.createElement("div"));
   el.classList.add("qlty-coverage-gutter");
-  if (hit > 0) {
-    el.classList.add("qlty-coverage-hit");
-  } else if (hit === 0) {
-    el.classList.add("qlty-coverage-miss");
-  } else if (hit < 0) {
-    el.classList.add("qlty-coverage-omit");
-  }
+  el.classList.add(coverageClass);
 }
 
 function injectCoverageSummary(
